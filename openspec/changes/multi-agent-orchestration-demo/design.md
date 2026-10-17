@@ -19,7 +19,7 @@
 ## Decisions
 
 **1. 用 LangGraph 的 `StateGraph` + 条件边实现「主管路由」**
-- 一个共享的 `State`（TypedDict，含 `messages`、`task_type`、`result`）贯穿整张图。
+- 一个共享的 `State`（TypedDict，含 `task`、`task_type`、`result`）贯穿整张图。
 - `supervisor` 节点调用 LLM 把任务归类（translate / summarize / write），写回 `task_type`。
 - 用 `add_conditional_edges` 根据 `task_type` 路由到对应 worker；worker 执行后回到 `aggregate` 节点汇总，再 `END`。
 - 备选：固定线性流水线（writer→translator）—— 简单，但体现不出「调度/路由」；备选：AutoGen 群聊 —— 交互丰富但封装过重、不利于看底层机制。选 LangGraph 图编排最贴合「学习调度」目标。
