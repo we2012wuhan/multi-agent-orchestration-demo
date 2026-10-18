@@ -2,3 +2,7 @@ langgraph
 langchain-openai
 langchain-core
 python-dotenv
+fastapi
+uvicorn
+pytest
+httpx

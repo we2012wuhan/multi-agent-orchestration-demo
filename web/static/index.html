@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>多智能体编排演示</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>多智能体编排演示</h1>
+      <p class="subtitle">Supervisor 分类 → 路由到专职 Worker → 汇总结果</p>
+    </div>
+    <span id="status" class="status idle">空闲</span>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>提交任务</h2>
+      <textarea id="task" rows="5" placeholder="例如：把下面这句话翻译成英文：今天天气很好……"></textarea>
+      <div class="examples">
+        <button class="chip" data-task="把下面这句话翻译成英文：今天天气很好，我们一起去公园散步吧。">翻译示例</button>
+        <button class="chip" data-task="总结下面这段内容的要点：多智能体调度由主管 agent 分析任务并分派给多个专职 agent，最终汇总结果。">总结示例</button>
+        <button class="chip" data-task="帮我写一段智能音箱的产品介绍，100 字左右。">撰写示例</button>
+        <button class="chip" data-task="帮我算一下 1+1 等于多少。">未知类型示例</button>
+      </div>
+      <button id="run" class="primary">运行</button>
+      <p id="form-error" class="form-error hidden"></p>
+    </section>
+
+    <section class="panel">
+      <h2>执行流程</h2>
+      <div class="flow" id="flow">
+        <div class="flow-node ghost">START</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-node="supervisor">supervisor<small>主管分类</small></div>
+        <div class="flow-arrow">↓ 条件路由</div>
+        <div class="flow-row">
+          <div class="flow-node" data-node="translate">translate<small>翻译</small></div>
+          <div class="flow-node" data-node="summarize">summarize<small>总结</small></div>
+          <div class="flow-node" data-node="write">write<small>撰写</small></div>
+          <div class="flow-node" data-node="unknown">unknown<small>兜底提示</small></div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-node="aggregate">aggregate<small>汇总</small></div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node ghost">END</div>
+      </div>
+    </section>
+
+    <section class="panel span-2">
+      <h2>执行记录</h2>
+      <ol id="timeline" class="timeline"><li class="empty">等待运行…</li></ol>
+    </section>
+
+    <section class="panel span-2">
+      <h2>最终结果</h2>
+      <div id="result" class="result empty">尚未运行</div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
