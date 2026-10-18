@@ -50,6 +50,7 @@ def _unknown(state: State) -> dict:
 
 
 def _aggregate(state: State) -> dict:
+    print(">>> aggregate reached")
     """汇总节点：当前是单 worker 场景，直接透传结果；将来多 worker 在此拼接。"""
     return {"result": state["result"]}
 

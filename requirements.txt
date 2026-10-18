@@ -6,3 +6,5 @@ fastapi
 uvicorn
 pytest
 httpx
+# 可选：show_graph.py 的 ASCII 图渲染
+grandalf

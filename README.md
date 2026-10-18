@@ -54,6 +54,14 @@ cp .env.example .env
 .venv/Scripts/python.exe -m pytest -q
 ```
 
+## 查看图结构
+
+```bash
+.venv/Scripts/python.exe show_graph.py             # 终端 ASCII 图
+.venv/Scripts/python.exe show_graph.py --mermaid   # 输出 Mermaid 文本（可粘贴到 mermaid.live）
+.venv/Scripts/python.exe show_graph.py --png       # 导出 graph.png（需要联网）
+```
+
 ## 项目结构
 
 | 文件 | 作用 |

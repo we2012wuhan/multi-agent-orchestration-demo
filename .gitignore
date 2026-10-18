@@ -27,3 +27,6 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# 生成的图
+graph.png
