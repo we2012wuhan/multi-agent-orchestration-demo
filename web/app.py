@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agents import WORKER_PROMPTS  # noqa: E402
-from graph import build_graph  # noqa: E402
+from graph import MAX_TOOL_ROUNDS, TASK_ROUTES, build_graph  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
@@ -75,19 +75,65 @@ class RunRequest(BaseModel):
     task: str
 
 
-def _next_node(node: str, delta: dict) -> str | None:
+def _next_node(node: str, delta: dict, tool_rounds: int) -> str | None:
     """根据刚结束的节点推导下一个节点，用于前端高亮当前步骤。"""
     if node == "supervisor":
         task_type = delta.get("task_type", "unknown")
-        return task_type if task_type in WORKER_PROMPTS else "unknown"
+        return TASK_ROUTES.get(task_type, "unknown")
+    if node == "tool_agent":
+        messages = delta.get("messages") or []
+        last = messages[-1] if messages else None
+        has_tool_calls = bool(getattr(last, "tool_calls", None))
+        if has_tool_calls and tool_rounds < MAX_TOOL_ROUNDS:
+            return "tools"
+        return "aggregate"
+    if node == "tools":
+        return "tool_agent"
     if node in WORKER_PROMPTS or node == "unknown":
         return "aggregate"
     return None
 
 
+def _serialize_delta(node: str, delta: dict, tool_rounds: int) -> dict:
+    """把 LangChain 消息对象转成前端可消费的纯 JSON。"""
+    if node == "tool_agent":
+        messages = delta.get("messages") or []
+        last = messages[-1] if messages else None
+        if last is None:
+            return {}
+        calls = [
+            {"name": call.get("name"), "args": call.get("args") or {}}
+            for call in (getattr(last, "tool_calls", None) or [])
+        ]
+        return {"content": str(last.content or ""), "tool_calls": calls}
+
+    if node == "tools":
+        results = []
+        for message in delta.get("messages") or []:
+            content = str(message.content or "")
+            if len(content) > 1200:
+                content = content[:1200] + "…"
+            results.append({
+                "name": getattr(message, "name", "") or "",
+                "content": content,
+            })
+        return {
+            "tool_results": results,
+            "tool_rounds": tool_rounds,
+        }
+
+    return delta
+
+
 async def _execute_run(task: str, queue: asyncio.Queue) -> None:
     """后台执行一次编排，把每个节点的进度写入队列。"""
-    state = {"task": task, "task_type": "", "result": ""}
+    state = {
+        "task": task,
+        "task_type": "",
+        "result": "",
+        "messages": [],
+    }
+    tool_rounds = 0
     try:
         await queue.put({"type": "run_started", "task": task})
         await queue.put({"type": "node_start", "node": "supervisor"})
@@ -96,8 +142,14 @@ async def _execute_run(task: str, queue: asyncio.Queue) -> None:
             for node, delta in update.items():
                 delta = delta or {}
                 state.update(delta)
-                await queue.put({"type": "node_end", "node": node, "data": delta})
-                nxt = _next_node(node, delta)
+                if node == "tools":
+                    tool_rounds += 1
+                await queue.put({
+                    "type": "node_end",
+                    "node": node,
+                    "data": _serialize_delta(node, delta, tool_rounds),
+                })
+                nxt = _next_node(node, delta, tool_rounds)
                 if nxt:
                     await queue.put({"type": "node_start", "node": nxt})
 

@@ -27,7 +27,12 @@ def main() -> None:
     task = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TASK
     graph = build_graph()
 
-    final = graph.invoke({"task": task, "task_type": "", "result": ""})
+    final = graph.invoke({
+        "task": task,
+        "task_type": "",
+        "result": "",
+        "messages": [],
+    })
     print(f"任务类型：{final['task_type']}")
     print(f"结果：{final['result']}")
 

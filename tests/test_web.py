@@ -4,6 +4,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.tools import tool
 
 import graph as graph_module
 import web.app as web_app
@@ -87,3 +89,75 @@ def test_unknown_task_skips_worker(client, monkeypatch):
 
     node_order = [e["node"] for e in events if e["type"] == "node_end"]
     assert node_order == ["supervisor", "unknown", "aggregate"]
+
+
+@tool
+def fake_search(query: str) -> str:
+    """返回固定的搜索结果。"""
+    return f"关于「{query}」的搜索结果：LangGraph 是一个编排框架。"
+
+
+class _FakeToolLLM:
+    def __init__(self, handler):
+        self._handler = handler
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def invoke(self, messages):
+        return self._handler(messages)
+
+
+def test_search_run_streams_tool_loop(client, monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    replies = {"count": 0}
+
+    def tool_handler(_messages):
+        replies["count"] += 1
+        if replies["count"] == 1:
+            return AIMessage(
+                content="",
+                tool_calls=[{
+                    "name": "fake_search",
+                    "args": {"query": "LangGraph"},
+                    "id": "call_1",
+                    "type": "tool_call",
+                }],
+            )
+        return AIMessage(content="搜索结论：LangGraph 是编排框架。")
+
+    def fake_build_llm():
+        def handler(messages):
+            if isinstance(messages, str):  # supervisor 输入是字符串
+                return AIMessage(content="search")
+            return tool_handler(messages)
+
+        return _FakeToolLLM(handler)
+
+    monkeypatch.setattr(graph_module, "build_llm", fake_build_llm)
+    monkeypatch.setattr(
+        web_app, "GRAPH", graph_module.build_graph(tools=[fake_search])
+    )
+
+    resp = client.post("/api/runs", json={"task": "搜索 LangGraph"})
+    assert resp.status_code == 200
+
+    events = _collect_events(client, resp.json()["run_id"])
+    node_order = [e["node"] for e in events if e["type"] == "node_end"]
+    assert node_order == [
+        "supervisor", "tool_agent", "tools", "tool_agent", "aggregate",
+    ]
+    starts = [e["node"] for e in events if e["type"] == "node_start"]
+    assert starts == [
+        "supervisor", "tool_agent", "tools", "tool_agent", "aggregate",
+    ]
+
+    tools_end = next(
+        e for e in events if e["type"] == "node_end" and e["node"] == "tools"
+    )
+    assert tools_end["data"]["tool_rounds"] == 1
+    assert "LangGraph" in tools_end["data"]["tool_results"][0]["content"]
+
+    done = next(e for e in events if e["type"] == "done")
+    assert done["task_type"] == "search"
+    assert done["result"] == "搜索结论：LangGraph 是编排框架。"

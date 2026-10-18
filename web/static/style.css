@@ -126,9 +126,22 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent
 .flow-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 10px;
 }
+.loop-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: #fafaff;
+}
+.loop-pair .flow-node { min-width: 104px; }
+.loop-arrow { color: var(--muted); font-size: 11px; }
 .flow-node {
   min-width: 96px;
   padding: 8px 12px;
@@ -209,6 +222,11 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent
   min-height: 72px;
 }
 .result.empty { color: var(--muted); }
+.result .body { white-space: pre-wrap; }
+.result .body a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
 .result .route {
   display: inline-block;
   margin-bottom: 10px;

@@ -4,6 +4,8 @@ const NODE_LABELS = {
   summarize: "总结",
   write: "撰写",
   unknown: "未知类型",
+  tool_agent: "工具智能体",
+  tools: "执行工具",
   aggregate: "汇总",
 };
 
@@ -54,6 +56,23 @@ function addTimeline(kind, title, detail) {
   timelineEl.scrollTop = timelineEl.scrollHeight;
 }
 
+function renderTextWithLinks(container, text) {
+  const urlPattern = /(https?:\/\/[^\s)]+)/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = urlPattern.exec(text)) !== null) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    const link = document.createElement("a");
+    link.href = match[0];
+    link.textContent = match[0];
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    container.appendChild(link);
+    lastIndex = match.index + match[0].length;
+  }
+  container.appendChild(document.createTextNode(text.slice(lastIndex)));
+}
+
 function nodeEl(name) {
   return flowNodes.find((n) => n.dataset.node === name);
 }
@@ -87,6 +106,24 @@ function handleEvent(ev) {
         addTimeline("end", "主管分类", `task_type = ${ev.data.task_type}`);
       } else if (ev.node === "unknown") {
         addTimeline("end", "兜底提示", ev.data.result || "");
+      } else if (ev.node === "tool_agent") {
+        const calls = ev.data.tool_calls || [];
+        if (calls.length) {
+          const desc = calls
+            .map((c) => `${c.name}(${JSON.stringify(c.args)})`)
+            .join("；");
+          addTimeline("end", "请求调用工具", desc);
+        } else if (ev.data.content) {
+          addTimeline("end", "工具智能体回答", ev.data.content);
+        }
+      } else if (ev.node === "tools") {
+        const results = ev.data.tool_results || [];
+        const preview = results.map((r) => r.content).join(" ").slice(0, 180);
+        addTimeline(
+          "end",
+          `工具执行完成（第 ${ev.data.tool_rounds} 轮）`,
+          `${results.length} 个结果：${preview}`
+        );
       } else if (ev.node !== "aggregate" && ev.data.result) {
         addTimeline("end", `${ev.node} 输出`, ev.data.result);
       }
@@ -101,7 +138,7 @@ function handleEvent(ev) {
       resultEl.className = "result";
       resultEl.innerHTML = `<span class="route"></span><div class="body"></div>`;
       resultEl.querySelector(".route").textContent = `路由：${ev.task_type}`;
-      resultEl.querySelector(".body").textContent = ev.result;
+      renderTextWithLinks(resultEl.querySelector(".body"), ev.result || "");
       addTimeline("done", "执行完成", `task_type = ${ev.task_type}`);
       setStatus("完成", "done");
       runBtn.disabled = false;
